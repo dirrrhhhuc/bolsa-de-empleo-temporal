@@ -406,13 +406,28 @@ document.getElementById('tabnav').addEventListener('click',e=>{
  document.getElementById(pid).classList.add('active');
  // render direction pages lazily, the first time they are opened
  if(typeof ensureDirRendered==='function') ensureDirRendered(pid);
- // charts drawn while hidden need a resize once visible
- requestAnimationFrame(()=>{
+ // charts drawn while hidden need a resize once the page is visible.
+ // Several passes (immediate + delayed) ensure every chart on the page,
+ // including those lower down, gets correctly laid out and drawn.
+ function refreshCharts(){
   Object.keys(charts).forEach(k=>{
-   if(k.indexOf(pid+'_')===0 && charts[k]){ try{charts[k].resize();charts[k].update('none');}catch(e){} }
+   if(k.indexOf(pid+'_')===0 && charts[k]){
+    try{ charts[k].resize(); charts[k].update('none'); }catch(e){}
+   }
   });
- });
+ }
+ requestAnimationFrame(refreshCharts);
+ setTimeout(refreshCharts,120);
+ setTimeout(refreshCharts,400);
  window.scrollTo({top:0,behavior:'smooth'});
+});
+window.addEventListener('resize',()=>{
+ const ap=document.querySelector('.page.active');
+ if(!ap) return;
+ const pid=ap.id;
+ Object.keys(charts).forEach(k=>{
+  if(k.indexOf(pid+'_')===0 && charts[k]){ try{charts[k].resize();}catch(e){} }
+ });
 });
 
 /* ---------- PAGE 1: VISTA GENERAL ---------- */
