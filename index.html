@@ -7,6 +7,31 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <style>
+ <script>
+   // Protección con contraseña
+   (function() {
+        const correctPassword = '321116';
+        const passwordPrompt = () => {
+               let password = prompt('Por favor ingresa la contraseña para acceder:');
+               if (password === correctPassword) {
+                        sessionStorage.setItem('authenticated', 'true');
+                } else if (password !== null) {
+                                 alert('Contraseña incorrecta. Intenta de nuevo.');
+                                 passwordPrompt();
+                        } else {
+                                 window.location.href = 'about:blank';
+                        }
+               };
+
+             if (!sessionStorage.getItem('authenticated')) {
+                    document.body.style.display = 'none';
+                    passwordPrompt();
+                    if (sessionStorage.getItem('authenticated')) {
+                             document.body.style.display = 'block';
+                    }
+             }
+        })();
+    </script>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
  --blue:#0072BC; --blue-d:#00528A; --blue-l:#4A9FD4; --navy:#003A66;
