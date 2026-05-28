@@ -178,6 +178,25 @@ tbody tr:hover{background:#e7f2fa}
 #gate .gerr{color:#c0392b;font-size:.8rem;font-weight:600;margin-top:11px;min-height:18px}
 #gate .gfoot{margin-top:18px;font-size:.68rem;color:#9aa7b4;line-height:1.5}
 body.locked{overflow:hidden}
+/* --- segunda clave: Análisis Detallado --- */
+#gate2{display:none;position:fixed;inset:0;z-index:9990;background:rgba(0,20,50,.55);
+ align-items:center;justify-content:center;padding:20px}
+#gate2.show{display:flex}
+#gate2 .g2box{background:#fff;border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.28);
+ width:100%;max-width:360px;padding:30px 28px 26px;text-align:center}
+#gate2 h3{font-size:1.05rem;color:#003A66;font-weight:800;margin-bottom:4px}
+#gate2 p{font-size:.8rem;color:#6a7787;margin-bottom:18px}
+#gate2 label{display:block;text-align:left;font-size:.7rem;text-transform:uppercase;
+ letter-spacing:.6px;color:#6a7787;font-weight:700;margin-bottom:5px}
+#gate2 input{width:100%;padding:10px 12px;border:1.5px solid #d2dee8;border-radius:9px;
+ font-size:1.05rem;letter-spacing:3px;text-align:center;color:#1c2733}
+#gate2 input:focus{outline:2px solid #4A9FD4;border-color:#4A9FD4}
+#gate2 button{width:100%;margin-top:14px;padding:11px;border:none;border-radius:9px;
+ background:#0072BC;color:#fff;font-size:.92rem;font-weight:700;cursor:pointer}
+#gate2 button:hover{background:#00528A}
+#gate2 .g2cancel{margin-top:10px;background:none;border:none;color:#6a7787;font-size:.8rem;
+ cursor:pointer;text-decoration:underline;width:auto;padding:0}
+#gate2 .g2err{color:#c0392b;font-size:.78rem;font-weight:600;margin-top:10px;min-height:16px}
 /* --- carga de datos desde Excel --- */
 #loadspin{position:fixed;inset:0;z-index:8000;background:#f3f6fa;display:flex;
  flex-direction:column;align-items:center;justify-content:center;gap:18px}
@@ -204,6 +223,17 @@ body.locked{overflow:hidden}
   <h3>No se pudieron cargar los datos</h3>
   <div class="lmsg"></div>
   <p>Compruebe que el archivo <b>3_1_Dashboard_Bolsa.xlsx</b> está subido en el mismo repositorio que esta página y que conserva las hojas <b>2026</b>, <b>I91c</b> e <b>I9B1a</b>. Si el problema persiste, contacte con la Dirección de RR.HH.</p>
+ </div>
+</div>
+<div id="gate2">
+ <div class="g2box">
+  <h3>Análisis Detallado</h3>
+  <p>Este apartado requiere una clave de acceso adicional.</p>
+  <label for="g2pass">Clave de acceso</label>
+  <input type="password" id="g2pass" inputmode="numeric" autocomplete="off" maxlength="20" placeholder="••••••">
+  <button id="g2btn">Acceder</button>
+  <div class="g2err" id="g2err"></div>
+  <button class="g2cancel" id="g2cancel">Cancelar</button>
  </div>
 </div>
 <div id="gate">
@@ -696,6 +726,10 @@ function doughCfg(entries,cut){return {type:'doughnut',data:{labels:entries.map(
 /* ---------- TABS (event delegation, supports dynamic tabs) ---------- */
 document.getElementById('tabnav').addEventListener('click',e=>{
  const t=e.target.closest('.tab'); if(!t) return;
+ // si es la pestaña de Análisis Detallado y no está desbloqueada, pedir clave
+ if(t.dataset.page==='p2' && typeof window.__detalle_unlocked==='function' && !window.__detalle_unlocked()){
+  window.__detalle_request(t); return;
+ }
  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
  t.classList.add('active');
@@ -1051,7 +1085,41 @@ document.getElementById('btnReset').addEventListener('click',()=>{
  document.getElementById('tblSearch').value='';renderDetalle();
 });
 
-/* ===== Punto de entrada: el cargador de Excel llama aquí con los datos ===== */
+/* ===== Segunda clave: Análisis Detallado ===== */
+(function(){
+ var KEY2='34151';
+ var unlocked=false;
+ try{ if(sessionStorage.getItem('chuc_detalle_ok')==='1') unlocked=true; }catch(e){}
+ var pending=null; // tab button waiting to be activated
+ var g2=document.getElementById('gate2');
+ var inp=document.getElementById('g2pass');
+ var btn=document.getElementById('g2btn');
+ var cancel=document.getElementById('g2cancel');
+ var err=document.getElementById('g2err');
+ function unlock2(){
+  unlocked=true;
+  try{ sessionStorage.setItem('chuc_detalle_ok','1'); }catch(e){}
+  g2.classList.remove('show');
+  if(pending){ pending.click(); pending=null; }
+ }
+ function tryPass(){
+  if(inp.value===KEY2){ unlock2(); }
+  else{ err.textContent='Clave incorrecta.'; inp.value=''; inp.focus(); }
+ }
+ if(btn){ btn.addEventListener('click',tryPass); }
+ if(inp){ inp.addEventListener('keydown',function(e){ if(e.key==='Enter') tryPass(); }); }
+ if(cancel){ cancel.addEventListener('click',function(){
+  g2.classList.remove('show'); pending=null;
+  if(inp){ inp.value=''; } if(err){ err.textContent=''; }
+ }); }
+ window.__detalle_unlocked=function(){ return unlocked; };
+ window.__detalle_request=function(tabBtn){
+  if(unlocked){ return true; }
+  pending=tabBtn; g2.classList.add('show');
+  setTimeout(function(){ if(inp) inp.focus(); },100);
+  return false;
+ };
+})();
 function initDashboard(loaded){
  DATA = loaded;
  ROWS = DATA.rows;
