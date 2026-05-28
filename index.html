@@ -617,7 +617,7 @@ async function loadDashboard(){
    Nota: una página estática no permite una contraseña segura;
    esta clave solo evita accesos casuales. */
 (function(){
- var KEY='321116';
+ var KEY='34151';
  var gate=document.getElementById('gate');
  var inp=document.getElementById('gpass');
  var btn=document.getElementById('gbtn');
@@ -1067,6 +1067,15 @@ function renderDetalle(){
  mkChart('cGfh',{type:'bar',data:{labels:gf.map(e=>e[0]),datasets:[{data:gf.map(e=>e[1]),backgroundColor:gf.map((_,i)=>PAL[i%PAL.length]),borderRadius:5}]},
   options:{...baseOpts,scales:{y:{beginAtZero:true,grid:{color:'#eef2f6'},ticks:{callback:function(v){try{return Number(v).toLocaleString('es-ES',{useGrouping:true});}catch(e){return v;}}}},x:{grid:{display:false},ticks:{font:{size:8.5},maxRotation:55,minRotation:45}}}}});
  renderTable(d);
+ // forzar resize en todas las gráficas de p2 para que Chart.js calcule bien las dimensiones
+ function resizeP2(){
+  ['cTime','cDir','cPlaza','cRazon','cClau','cDur','cContr','cGfh'].forEach(k=>{
+   if(charts[k]){try{charts[k].resize();charts[k].update('none');}catch(e){}}
+  });
+ }
+ requestAnimationFrame(resizeP2);
+ setTimeout(resizeP2,120);
+ setTimeout(resizeP2,400);
 }
 function renderTable(d){
  const q=document.getElementById('tblSearch').value.toLowerCase();
@@ -1087,7 +1096,7 @@ document.getElementById('btnReset').addEventListener('click',()=>{
 
 /* ===== Segunda clave: Análisis Detallado ===== */
 (function(){
- var KEY2='34151';
+ var KEY2='321116';
  var unlocked=false;
  try{ if(sessionStorage.getItem('chuc_detalle_ok')==='1') unlocked=true; }catch(e){}
  var pending=null; // tab button waiting to be activated
