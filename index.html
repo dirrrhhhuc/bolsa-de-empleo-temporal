@@ -295,7 +295,26 @@ body.locked{overflow:hidden}
   </div>
 
   <div class="grid">
-   <div class="card span12"><h3>Activos totales de la Bolsa I91c (Tope)</h3>
+   <!-- ===== RESUMEN POR DIRECCIÓN Y GASTO ===== -->
+   <div class="card span12">
+    <h3>Resumen de consumo de Bolsas por Dirección</h3>
+    <div class="cs">Días usados vs. disponibles en cada Bolsa (I91c e I9B1a) por Dirección · Ejercicio 2026</div>
+    <div id="gResumenDir" style="display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:16px">
+     <!-- se rellena dinámicamente -->
+    </div>
+   </div>
+   <div class="card span8">
+    <h3>Gasto por Dirección — Días consumidos (Bolsa I91c + I9B1a)</h3>
+    <div class="cs">Total de días utilizados de ambas bolsas agrupados por Dirección</div>
+    <div class="chart-box tall"><canvas id="gGastoDirBar"></canvas></div>
+   </div>
+   <div class="card span4">
+    <h3>Proporción del gasto por Dirección</h3>
+    <div class="cs">Peso relativo de cada Dirección sobre el gasto total</div>
+    <div class="chart-box" style="height:320px"><canvas id="gGastoDirDonut"></canvas></div>
+   </div>
+   <!-- ===== FIN RESUMEN ===== -->
+      <div class="card span12"><h3>Activos totales de la Bolsa I91c (Tope)</h3>
     <div class="cs">Distribución del tope de la Bolsa I91c por Dirección</div>
     <div class="tope-wrap">
      <div class="tope-chart">
@@ -810,7 +829,99 @@ function renderGeneral(){
  const co=topN(countBy(d,'contrato'),6);
  mkChart('gContrCh',{type:'doughnut',data:{labels:co.map(e=>e[0].length>24?e[0].slice(0,24)+'…':e[0]),datasets:[{data:co.map(e=>e[1]),backgroundColor:PAL,borderColor:'#fff',borderWidth:2}]},
   options:{...baseOpts,cutout:'52%',plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:9,font:{size:8.5},padding:5}}}}});
- renderTope();
+
+ // ---- RESUMEN POR DIRECCIÓN Y GASTO ----
+ renderResumenDir();
+  renderTope();
+}
+
+/* ---------- RESUMEN POR DIRECCIÓN Y GASTO ---------- */
+function renderResumenDir(){
+ if(!DATA.bolsa && !DATA.bolsa_i9b1a) return;
+
+ const DIR_ORDER_CANON = ['gerencia','medica','enfermeria','planificacion','ingenieria','serviciosgenerales','rrhh'];
+ const DIR_OFICIAL = {
+  gerencia:'Gerencia', medica:'Dir. Médica', enfermeria:'Dir. Enfermería',
+  planificacion:'Dir. Planificación', ingenieria:'Dir. Ingeniería',
+  serviciosgenerales:'Dir. Servicios Generales', rrhh:'Dir. RR.HH.'
+ };
+
+ // Recopilar datos por canonico
+ const dirData={};
+ // usar claves canonicas de tope para coherencia
+ DIR_ORDER_CANON.forEach(c=>{
+  const nombre = Object.keys(DATA.bolsa||{}).find(k=>dirKey(k)===c)
+               || Object.keys(DATA.bolsa_i9b1a||{}).find(k=>dirKey(k)===c)
+               || c;
+  const b91  = (DATA.bolsa||{})[nombre]        || {tope:0,usados:0,resto:0};
+  const b9b  = (DATA.bolsa_i9b1a||{})[nombre]  || {tope:0,usados:0,resto:0};
+  dirData[c] = {nombre, b91, b9b};
+ });
+
+ // ----- Tarjetas individuales -----
+ const wrap = document.getElementById('gResumenDir');
+ wrap.innerHTML='';
+ DIR_ORDER_CANON.forEach(c=>{
+  const {nombre,b91,b9b}=dirData[c];
+  const col=dirColor(nombre);
+  const pct91 = b91.tope>0 ? Math.min(100,100*b91.usados/b91.tope).toFixed(1) : '—';
+  const pct9b = b9b.tope>0 ? Math.min(100,100*b9b.usados/b9b.tope).toFixed(1) : '—';
+  const totalUsado = b91.usados + b9b.usados;
+  const totalTope  = b91.tope + b9b.tope;
+  const pctTotal   = totalTope>0 ? Math.min(100,100*totalUsado/totalTope).toFixed(1) : '—';
+
+  const card = document.createElement('div');
+  card.style.cssText='background:#f8fafc;border:1px solid #e2eaf2;border-radius:14px;padding:15px 18px;border-left:5px solid '+col;
+  card.innerHTML=
+   '<div style="font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:'+col+';margin-bottom:10px">'+nombre+'</div>'+
+   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.82rem">'+
+    '<div><span style="color:#8a9ab0;font-size:.7rem">I91c — Tope</span><br><b>'+fmt(b91.tope)+'</b> días</div>'+
+    '<div><span style="color:#8a9ab0;font-size:.7rem">I91c — Usados</span><br><b>'+fmt(b91.usados)+'</b> <span style="color:'+(b91.resto>=0?'#1f8a4c':'#c0392b')+'">'+pct91+'%</span></div>'+
+    '<div><span style="color:#8a9ab0;font-size:.7rem">I9B1a — Tope</span><br><b>'+fmt(b9b.tope)+'</b> días</div>'+
+    '<div><span style="color:#8a9ab0;font-size:.7rem">I9B1a — Usados</span><br><b>'+fmt(b9b.usados)+'</b> <span style="color:'+(b9b.resto>=0?'#1f8a4c':'#c0392b')+'">'+pct9b+'%</span></div>'+
+   '</div>'+
+   '<div style="margin-top:11px">'+
+    '<div style="display:flex;justify-content:space-between;font-size:.72rem;color:#8a9ab0;margin-bottom:3px"><span>Consumo total ambas bolsas</span><span>'+pctTotal+'%</span></div>'+
+    '<div style="background:#e8eff7;border-radius:6px;height:8px;overflow:hidden">'+
+     '<div style="height:100%;border-radius:6px;background:'+col+';width:'+pctTotal+'%;transition:width .6s ease"></div>'+
+    '</div>'+
+    '<div style="display:flex;justify-content:space-between;font-size:.72rem;margin-top:4px"><span style="color:#1f8a4c">Usados: '+fmt(totalUsado)+'</span><span style="color:#4a6378">Tope: '+fmt(totalTope)+'</span></div>'+
+   '</div>';
+  wrap.appendChild(card);
+ });
+
+ // ----- Gráfica de barras: gasto total por dirección -----
+ const labels=[], dataUsado91=[], dataUsado9b=[], bgColors=[], nombresList=[];
+ DIR_ORDER_CANON.forEach(c=>{
+  const {nombre,b91,b9b}=dirData[c];
+  const lbl=DIR_OFICIAL[c]||nombre;
+  labels.push(lbl); nombresList.push(nombre);
+  dataUsado91.push(b91.usados);
+  dataUsado9b.push(b9b.usados);
+  bgColors.push(dirColor(nombre));
+ });
+ mkChart('gGastoDirBar',{type:'bar',
+  data:{labels,datasets:[
+   {label:'Días I91c',data:dataUsado91,backgroundColor:bgColors.map(c=>c+'cc'),borderRadius:5,maxBarThickness:36,stack:'s'},
+   {label:'Días I9B1a',data:dataUsado9b,backgroundColor:bgColors,borderRadius:5,maxBarThickness:36,stack:'s'}
+  ]},
+  options:{...baseOpts,
+   plugins:{legend:{display:true,position:'bottom',labels:{usePointStyle:true,boxWidth:9,font:{size:10},padding:8}},
+    tooltip:{callbacks:{label:c=>' '+c.dataset.label+': '+fmt(c.parsed.y)}}},
+   scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9.5},maxRotation:35,minRotation:20}},
+           y:{stacked:true,beginAtZero:true,grid:{color:'#eef2f6'},
+              ticks:{callback:v=>Number(v).toLocaleString('es-ES',{useGrouping:true})}}}}});
+
+ // ----- Doughnut: proporción del gasto -----
+ const totalsPorDir = DIR_ORDER_CANON.map(c=>dirData[c].b91.usados+dirData[c].b9b.usados);
+ const labelsDonut  = DIR_ORDER_CANON.map(c=>DIR_OFICIAL[c]||c);
+ const colorsDonut  = DIR_ORDER_CANON.map(c=>dirColor(dirData[c].nombre));
+ const sumTotal = totalsPorDir.reduce((a,b)=>a+b,0);
+ mkChart('gGastoDirDonut',{type:'doughnut',
+  data:{labels:labelsDonut,datasets:[{data:totalsPorDir,backgroundColor:colorsDonut,borderColor:'#fff',borderWidth:2}]},
+  options:{...baseOpts,cutout:'62%',
+   plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:9,font:{size:8.5},padding:6}},
+    tooltip:{callbacks:{label:c=>' '+c.label+': '+fmt(c.parsed)+' ('+( sumTotal>0?(100*c.parsed/sumTotal).toFixed(1):'0')+'%)'}}}}}});
 }
 
 /* ---------- ACTIVOS TOTALES — Bolsas I91c / I9B1a (Tope) ---------- */
