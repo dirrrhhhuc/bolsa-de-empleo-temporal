@@ -521,14 +521,14 @@ function dirOficial(s){
 /* ---- Topes de bolsas (estáticos del Excel, actualizables manualmente) ---- */
 const BOLSA_TOPES = {
  i91c: {
-  gerencia:1590, medica:13987, enfermeria:81127,
-  planificacion:8465, ingenieria:3143,
-  serviciosgenerales:15401, rrhh:1503
+  gerencia:1941, medica:23290, enfermeria:76506,
+  planificacion:6386, ingenieria:3005,
+  serviciosgenerales:11395, rrhh:2003
  },
  i9b1a: {
-  gerencia:5909, medica:51971, enfermeria:301449,
-  planificacion:31452, ingenieria:11678,
-  serviciosgenerales:57228, rrhh:5583
+  gerencia:7212, medica:86540, enfermeria:284281,
+  planificacion:23729, ingenieria:11167,
+  serviciosgenerales:42340, rrhh:7444
  }
 };
 
@@ -638,12 +638,13 @@ async function loadDashboard(){
   const url = CSV_FILE + '?v=' + Date.now();   // evita caché
   const resp = await fetch(url);
   if(!resp.ok) throw new Error('No se pudo encontrar el archivo "'+CSV_FILE+'" (código '+resp.status+').');
-  // El CSV puede venir en latin1 desde GitHub — usar Response.text() que detecta charset
+  // Detectar codificación: BOM UTF-8 (EF BB BF) o windows-1252 (CSVs antiguos)
   let text;
   try{
-   // Intentar con latin1 explícito
    const buf = await resp.arrayBuffer();
-   text = new TextDecoder('windows-1252').decode(buf);
+   const bytes = new Uint8Array(buf);
+   const tieneBOM = bytes.length>=3 && bytes[0]===0xEF && bytes[1]===0xBB && bytes[2]===0xBF;
+   text = tieneBOM ? new TextDecoder('utf-8').decode(buf) : new TextDecoder('windows-1252').decode(buf);
   }catch(e){
    text = await resp.text();
   }
@@ -921,7 +922,7 @@ function renderResumenDir(){
   data:{labels:labelsDonut,datasets:[{data:totalsPorDir,backgroundColor:colorsDonut,borderColor:'#fff',borderWidth:2}]},
   options:{...baseOpts,cutout:'62%',
    plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:9,font:{size:8.5},padding:6}},
-    tooltip:{callbacks:{label:c=>' '+c.label+': '+fmt(c.parsed)+' ('+( sumTotal>0?(100*c.parsed/sumTotal).toFixed(1):'0')+'%)'}}}}}});
+    tooltip:{callbacks:{label:c=>' '+c.label+': '+fmt(c.parsed)+' ('+( sumTotal>0?(100*c.parsed/sumTotal).toFixed(1):'0')+'%)'}}}}});
 }
 
 /* ---------- ACTIVOS TOTALES — Bolsas I91c / I9B1a (Tope) ---------- */
