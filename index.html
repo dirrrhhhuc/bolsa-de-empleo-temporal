@@ -498,7 +498,7 @@ function dirCanon(s){
  if(n.startsWith('gerencia'))return 'gerencia';
  if(n.startsWith('medica'))return 'medica';
  if(n.startsWith('enfermeria'))return 'enfermeria';
- if(n.startsWith('planificacion'))return 'planificacion';
+ if(n.startsWith('planificacion')||n.startsWith('planififcacion'))return 'planificacion';
  if(n.startsWith('ingen'))return 'ingenieria';
  if(n.startsWith('servicios'))return 'serviciosgenerales';
  if(n.startsWith('rrhh')||n.startsWith('rh'))return 'rrhh';
@@ -713,7 +713,7 @@ function dirKey(s){
  if(s.startsWith('gerencia'))return 'gerencia';
  if(s.startsWith('medica'))return 'medica';
  if(s.startsWith('enfermeria'))return 'enfermeria';
- if(s.startsWith('planificacion'))return 'planificacion';
+ if(s.startsWith('planificacion')||s.startsWith('planififcacion'))return 'planificacion';
  if(s.startsWith('ingenieria')||s.startsWith('ingeneria'))return 'ingenieria';
  if(s.startsWith('servicios'))return 'serviciosgenerales';
  if(s.startsWith('rrhh')||s.startsWith('rh'))return 'rrhh';
