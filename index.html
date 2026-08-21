@@ -298,13 +298,13 @@ body.locked{overflow:hidden}
    <!-- ===== RESUMEN POR DIRECCIÓN Y GASTO ===== -->
    <div class="card span12">
     <h3>Resumen de consumo de Bolsas por Dirección</h3>
-    <div class="cs">Días usados vs. disponibles en cada Bolsa (I91c e I9B1a) por Dirección · Ejercicio 2026</div>
+    <div class="cs">Días usados vs. disponibles en cada Bolsa (I91c, I9B1a, I9B1b e I9B1c) por Dirección · Ejercicio 2026</div>
     <div id="gResumenDir" style="display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:16px">
      <!-- se rellena dinámicamente -->
     </div>
    </div>
    <div class="card span8">
-    <h3>Gasto por Dirección — Días consumidos (Bolsa I91c + I9B1a)</h3>
+    <h3>Gasto por Dirección — Días consumidos (I91c + I9B1a + I9B1b + I9B1c)</h3>
     <div class="cs">Total de días utilizados de ambas bolsas agrupados por Dirección</div>
     <div class="chart-box tall"><canvas id="gGastoDirBar"></canvas></div>
    </div>
@@ -529,6 +529,16 @@ const BOLSA_TOPES = {
   gerencia:7212, medica:86540, enfermeria:284281,
   planificacion:23729, ingenieria:11167,
   serviciosgenerales:42340, rrhh:7444
+ },
+ i9b1b: {
+  gerencia:0, medica:0, enfermeria:0,
+  planificacion:0, ingenieria:0,
+  serviciosgenerales:0, rrhh:0
+ },
+ i9b1c: {
+  gerencia:0, medica:0, enfermeria:0,
+  planificacion:0, ingenieria:0,
+  serviciosgenerales:0, rrhh:0
  }
 };
 
@@ -557,8 +567,8 @@ function buildDataFromCSV(text){
  // Mapear campos CSV a campos del dashboard
  const rows = [];
  for(const r of rawRows){
-  const clau = (r['Cláusula']||'').trim();
-  if(clau==='I_9_1a') continue;  // excluir I_9_1a, como acordado
+  const clau = (r['Cláusula']||'').trim().toUpperCase();
+  if(clau==='I_9_1A') continue;  // excluir I_9_1A, como acordado
   const desde = parseDate(r['Desde*']);
   const hasta = parseDate(r['Hasta*'] || r['Hasta']);
   if(!desde||!hasta) continue;
@@ -582,22 +592,28 @@ function buildDataFromCSV(text){
  }
 
  // ---- Calcular usados de bolsas desde el CSV ----
- // I91c = cláusula I_9_1c; I9B1a = cláusulas S_9B_*
- const usados91c = {}, usados9b1a = {};
+ // I91c = cláusula I_9_1C
+ // I9B1a = cláusulas S_9B_1A / S_9B_1AV
+ // I9B1b = cláusulas S_9B_1B / S_9B_1BG
+ // I9B1c = cláusula S_9B_1C
+ const usados91c = {}, usados9b1a = {}, usados9b1b = {}, usados9b1c = {};
  for(const r of rows){
   const c = dirCanon(r.dir);
   if(!c) continue;
-  if(r.clausula==='I_9_1c'){
+  if(r.clausula==='I_9_1C'){
    usados91c[c] = (usados91c[c]||0) + r.dias;
-  }
-  if(r.clausula.startsWith('S_9B_')){
+  }else if(r.clausula==='S_9B_1A' || r.clausula==='S_9B_1AV'){
    usados9b1a[c] = (usados9b1a[c]||0) + r.dias;
+  }else if(r.clausula==='S_9B_1B' || r.clausula==='S_9B_1BG'){
+   usados9b1b[c] = (usados9b1b[c]||0) + r.dias;
+  }else if(r.clausula==='S_9B_1C'){
+   usados9b1c[c] = (usados9b1c[c]||0) + r.dias;
   }
  }
 
  // ---- Construir objetos de bolsa por dirección ----
  const realDirs = [...new Set(rows.map(r=>r.dir))].filter(Boolean);
- const bolsa = {}, bolsa_i9b1a = {};
+ const bolsa = {}, bolsa_i9b1a = {}, bolsa_i9b1b = {}, bolsa_i9b1c = {};
  realDirs.forEach(dn=>{
   const c = dirCanon(dn);
   const tope91 = BOLSA_TOPES.i91c[c]||0;
@@ -606,6 +622,12 @@ function buildDataFromCSV(text){
   const tope9b = BOLSA_TOPES.i9b1a[c]||0;
   const uso9b = Math.round(usados9b1a[c]||0);
   if(tope9b||uso9b) bolsa_i9b1a[dn] = {tope:tope9b, usados:uso9b, resto:tope9b-uso9b};
+  const tope9bb = BOLSA_TOPES.i9b1b[c]||0;
+  const uso9bb = Math.round(usados9b1b[c]||0);
+  if(tope9bb||uso9bb) bolsa_i9b1b[dn] = {tope:tope9bb, usados:uso9bb, resto:tope9bb-uso9bb};
+  const tope9bc = BOLSA_TOPES.i9b1c[c]||0;
+  const uso9bc = Math.round(usados9b1c[c]||0);
+  if(tope9bc||uso9bc) bolsa_i9b1c[dn] = {tope:tope9bc, usados:uso9bc, resto:tope9bc-uso9bc};
  });
 
  // ---- Activos totales (topes completos del Excel) ----
@@ -623,7 +645,9 @@ function buildDataFromCSV(text){
   tope: topeBlock('i91c'),
   tope_i9b1a: topeBlock('i9b1a'),
   bolsa: bolsa,
-  bolsa_i9b1a: bolsa_i9b1a
+  bolsa_i9b1a: bolsa_i9b1a,
+  bolsa_i9b1b: bolsa_i9b1b,
+  bolsa_i9b1c: bolsa_i9b1c
  };
 }
 
@@ -838,7 +862,7 @@ function renderGeneral(){
 
 /* ---------- RESUMEN POR DIRECCIÓN Y GASTO ---------- */
 function renderResumenDir(){
- if(!DATA.bolsa && !DATA.bolsa_i9b1a) return;
+ if(!DATA.bolsa && !DATA.bolsa_i9b1a && !DATA.bolsa_i9b1b && !DATA.bolsa_i9b1c) return;
 
  const DIR_ORDER_CANON = ['gerencia','medica','enfermeria','planificacion','ingenieria','serviciosgenerales','rrhh'];
  const DIR_OFICIAL = {
@@ -853,22 +877,28 @@ function renderResumenDir(){
  DIR_ORDER_CANON.forEach(c=>{
   const nombre = Object.keys(DATA.bolsa||{}).find(k=>dirKey(k)===c)
                || Object.keys(DATA.bolsa_i9b1a||{}).find(k=>dirKey(k)===c)
+               || Object.keys(DATA.bolsa_i9b1b||{}).find(k=>dirKey(k)===c)
+               || Object.keys(DATA.bolsa_i9b1c||{}).find(k=>dirKey(k)===c)
                || c;
   const b91  = (DATA.bolsa||{})[nombre]        || {tope:0,usados:0,resto:0};
   const b9b  = (DATA.bolsa_i9b1a||{})[nombre]  || {tope:0,usados:0,resto:0};
-  dirData[c] = {nombre, b91, b9b};
+  const b9bb = (DATA.bolsa_i9b1b||{})[nombre]  || {tope:0,usados:0,resto:0};
+  const b9bc = (DATA.bolsa_i9b1c||{})[nombre]  || {tope:0,usados:0,resto:0};
+  dirData[c] = {nombre, b91, b9b, b9bb, b9bc};
  });
 
  // ----- Tarjetas individuales -----
  const wrap = document.getElementById('gResumenDir');
  wrap.innerHTML='';
  DIR_ORDER_CANON.forEach(c=>{
-  const {nombre,b91,b9b}=dirData[c];
+  const {nombre,b91,b9b,b9bb,b9bc}=dirData[c];
   const col=dirColor(nombre);
   const pct91 = b91.tope>0 ? Math.min(100,100*b91.usados/b91.tope).toFixed(1) : '—';
   const pct9b = b9b.tope>0 ? Math.min(100,100*b9b.usados/b9b.tope).toFixed(1) : '—';
-  const totalUsado = b91.usados + b9b.usados;
-  const totalTope  = b91.tope + b9b.tope;
+  const pct9bb = b9bb.tope>0 ? Math.min(100,100*b9bb.usados/b9bb.tope).toFixed(1) : '—';
+  const pct9bc = b9bc.tope>0 ? Math.min(100,100*b9bc.usados/b9bc.tope).toFixed(1) : '—';
+  const totalUsado = b91.usados + b9b.usados + b9bb.usados + b9bc.usados;
+  const totalTope  = b91.tope + b9b.tope + b9bb.tope + b9bc.tope;
   const pctTotal   = totalTope>0 ? Math.min(100,100*totalUsado/totalTope).toFixed(1) : '—';
 
   const card = document.createElement('div');
@@ -880,9 +910,13 @@ function renderResumenDir(){
     '<div><span style="color:#8a9ab0;font-size:.7rem">I91c — Usados</span><br><b>'+fmt(b91.usados)+'</b> <span style="color:'+(b91.resto>=0?'#1f8a4c':'#c0392b')+'">'+pct91+'%</span></div>'+
     '<div><span style="color:#8a9ab0;font-size:.7rem">I9B1a — Tope</span><br><b>'+fmt(b9b.tope)+'</b> días</div>'+
     '<div><span style="color:#8a9ab0;font-size:.7rem">I9B1a — Usados</span><br><b>'+fmt(b9b.usados)+'</b> <span style="color:'+(b9b.resto>=0?'#1f8a4c':'#c0392b')+'">'+pct9b+'%</span></div>'+
+    '<div><span style="color:#8a9ab0;font-size:.7rem">I9B1b — Tope</span><br><b>'+fmt(b9bb.tope)+'</b> días</div>'+
+    '<div><span style="color:#8a9ab0;font-size:.7rem">I9B1b — Usados</span><br><b>'+fmt(b9bb.usados)+'</b> <span style="color:'+(b9bb.resto>=0?'#1f8a4c':'#c0392b')+'">'+pct9bb+'%</span></div>'+
+    '<div><span style="color:#8a9ab0;font-size:.7rem">I9B1c — Tope</span><br><b>'+fmt(b9bc.tope)+'</b> días</div>'+
+    '<div><span style="color:#8a9ab0;font-size:.7rem">I9B1c — Usados</span><br><b>'+fmt(b9bc.usados)+'</b> <span style="color:'+(b9bc.resto>=0?'#1f8a4c':'#c0392b')+'">'+pct9bc+'%</span></div>'+
    '</div>'+
    '<div style="margin-top:11px">'+
-    '<div style="display:flex;justify-content:space-between;font-size:.72rem;color:#8a9ab0;margin-bottom:3px"><span>Consumo total ambas bolsas</span><span>'+pctTotal+'%</span></div>'+
+    '<div style="display:flex;justify-content:space-between;font-size:.72rem;color:#8a9ab0;margin-bottom:3px"><span>Consumo total (4 bolsas)</span><span>'+pctTotal+'%</span></div>'+
     '<div style="background:#e8eff7;border-radius:6px;height:8px;overflow:hidden">'+
      '<div style="height:100%;border-radius:6px;background:'+col+';width:'+pctTotal+'%;transition:width .6s ease"></div>'+
     '</div>'+
@@ -892,19 +926,23 @@ function renderResumenDir(){
  });
 
  // ----- Gráfica de barras: gasto total por dirección -----
- const labels=[], dataUsado91=[], dataUsado9b=[], bgColors=[], nombresList=[];
+ const labels=[], dataUsado91=[], dataUsado9b=[], dataUsado9bb=[], dataUsado9bc=[], bgColors=[], nombresList=[];
  DIR_ORDER_CANON.forEach(c=>{
-  const {nombre,b91,b9b}=dirData[c];
+  const {nombre,b91,b9b,b9bb,b9bc}=dirData[c];
   const lbl=DIR_OFICIAL[c]||nombre;
   labels.push(lbl); nombresList.push(nombre);
   dataUsado91.push(b91.usados);
   dataUsado9b.push(b9b.usados);
+  dataUsado9bb.push(b9bb.usados);
+  dataUsado9bc.push(b9bc.usados);
   bgColors.push(dirColor(nombre));
  });
  mkChart('gGastoDirBar',{type:'bar',
   data:{labels,datasets:[
    {label:'Días I91c',data:dataUsado91,backgroundColor:bgColors.map(c=>c+'cc'),borderRadius:5,maxBarThickness:36,stack:'s'},
-   {label:'Días I9B1a',data:dataUsado9b,backgroundColor:bgColors,borderRadius:5,maxBarThickness:36,stack:'s'}
+   {label:'Días I9B1a',data:dataUsado9b,backgroundColor:bgColors,borderRadius:5,maxBarThickness:36,stack:'s'},
+   {label:'Días I9B1b',data:dataUsado9bb,backgroundColor:bgColors.map(c=>c+'88'),borderRadius:5,maxBarThickness:36,stack:'s'},
+   {label:'Días I9B1c',data:dataUsado9bc,backgroundColor:bgColors.map(c=>c+'55'),borderRadius:5,maxBarThickness:36,stack:'s'}
   ]},
   options:{...baseOpts,
    plugins:{legend:{display:true,position:'bottom',labels:{usePointStyle:true,boxWidth:9,font:{size:10},padding:8}},
@@ -914,7 +952,7 @@ function renderResumenDir(){
               ticks:{callback:v=>Number(v).toLocaleString('es-ES',{useGrouping:true})}}}}});
 
  // ----- Doughnut: proporción del gasto -----
- const totalsPorDir = DIR_ORDER_CANON.map(c=>dirData[c].b91.usados+dirData[c].b9b.usados);
+ const totalsPorDir = DIR_ORDER_CANON.map(c=>dirData[c].b91.usados+dirData[c].b9b.usados+dirData[c].b9bb.usados+dirData[c].b9bc.usados);
  const labelsDonut  = DIR_ORDER_CANON.map(c=>DIR_OFICIAL[c]||c);
  const colorsDonut  = DIR_ORDER_CANON.map(c=>dirColor(dirData[c].nombre));
  const sumTotal = totalsPorDir.reduce((a,b)=>a+b,0);
@@ -1036,6 +1074,52 @@ function buildDirPages(){
        <div class="bolsa-note" id="${pid}_xnote"></div>
       </div>
       <div class="chart-box" style="height:230px"><canvas id="${pid}_xchart"></canvas></div>
+     </div>
+   </div>
+   <div class="card span12" style="margin-bottom:17px">
+     <h3>Bolsa I9B1b — consumo de la Dirección (días)</h3>
+     <div class="cs">Días consumidos frente al tope asignado (tope no desglosado por Dirección en el Excel)</div>
+     <div class="bolsa-card">
+      <div>
+       <div class="bolsa-stats">
+        <div class="bolsa-stat bs-tope"><div class="bv" id="${pid}_wtope">0</div><div class="bl">Bolsa I9B1b (días)</div></div>
+        <div class="bolsa-stat bs-uso"><div class="bv" id="${pid}_wuso">0</div><div class="bl">Días usados</div></div>
+        <div class="bolsa-stat" id="${pid}_wrestbox"><div class="bv" id="${pid}_wrest">0</div><div class="bl" id="${pid}_wrestlbl">Días restantes</div></div>
+       </div>
+       <div class="progress-wrap">
+        <div class="progress-track" id="${pid}_wptrack"></div>
+        <div class="progress-legend">
+         <span><i style="background:#E8A33D"></i>Días usados</span>
+         <span><i style="background:#1f8a4c"></i>Días disponibles</span>
+         <span><i style="background:#c0392b"></i>Exceso sobre la bolsa</span>
+        </div>
+       </div>
+       <div class="bolsa-note" id="${pid}_wnote"></div>
+      </div>
+      <div class="chart-box" style="height:230px"><canvas id="${pid}_wchart"></canvas></div>
+     </div>
+   </div>
+   <div class="card span12" style="margin-bottom:17px">
+     <h3>Bolsa I9B1c — consumo de la Dirección (días)</h3>
+     <div class="cs">Días consumidos frente al tope asignado (tope no desglosado por Dirección en el Excel)</div>
+     <div class="bolsa-card">
+      <div>
+       <div class="bolsa-stats">
+        <div class="bolsa-stat bs-tope"><div class="bv" id="${pid}_ytope">0</div><div class="bl">Bolsa I9B1c (días)</div></div>
+        <div class="bolsa-stat bs-uso"><div class="bv" id="${pid}_yuso">0</div><div class="bl">Días usados</div></div>
+        <div class="bolsa-stat" id="${pid}_yrestbox"><div class="bv" id="${pid}_yrest">0</div><div class="bl" id="${pid}_yrestlbl">Días restantes</div></div>
+       </div>
+       <div class="progress-wrap">
+        <div class="progress-track" id="${pid}_yptrack"></div>
+        <div class="progress-legend">
+         <span><i style="background:#E8A33D"></i>Días usados</span>
+         <span><i style="background:#1f8a4c"></i>Días disponibles</span>
+         <span><i style="background:#c0392b"></i>Exceso sobre la bolsa</span>
+        </div>
+       </div>
+       <div class="bolsa-note" id="${pid}_ynote"></div>
+      </div>
+      <div class="chart-box" style="height:230px"><canvas id="${pid}_ychart"></canvas></div>
      </div>
    </div>
    <div class="kpis">
@@ -1161,6 +1245,12 @@ function renderBolsa(pid,dir){
  if(DATA.bolsa) renderBolsaBlock(DATA.bolsa[dir],dir,'I91c',
    {tope:pid+'_btope',uso:pid+'_buso',rest:pid+'_brest',restbox:pid+'_brestbox',
     restlbl:pid+'_brestlbl',track:pid+'_ptrack',note:pid+'_bnote',chart:pid+'_bchart'});
+ if(DATA.bolsa_i9b1b) renderBolsaBlock(DATA.bolsa_i9b1b[dir],dir,'I9B1b',
+   {tope:pid+'_wtope',uso:pid+'_wuso',rest:pid+'_wrest',restbox:pid+'_wrestbox',
+    restlbl:pid+'_wrestlbl',track:pid+'_wptrack',note:pid+'_wnote',chart:pid+'_wchart'});
+ if(DATA.bolsa_i9b1c) renderBolsaBlock(DATA.bolsa_i9b1c[dir],dir,'I9B1c',
+   {tope:pid+'_ytope',uso:pid+'_yuso',rest:pid+'_yrest',restbox:pid+'_yrestbox',
+    restlbl:pid+'_yrestlbl',track:pid+'_yptrack',note:pid+'_ynote',chart:pid+'_ychart'});
 }
 
 /* ---------- PAGE 2: ANÁLISIS DETALLADO ---------- */
