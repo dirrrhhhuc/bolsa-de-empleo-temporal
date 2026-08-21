@@ -893,10 +893,10 @@ function renderResumenDir(){
  DIR_ORDER_CANON.forEach(c=>{
   const {nombre,b91,b9b,b9bb,b9bc}=dirData[c];
   const col=dirColor(nombre);
-  const pct91 = b91.tope>0 ? Math.min(100,100*b91.usados/b91.tope).toFixed(1) : '—';
-  const pct9b = b9b.tope>0 ? Math.min(100,100*b9b.usados/b9b.tope).toFixed(1) : '—';
-  const pct9bb = b9bb.tope>0 ? Math.min(100,100*b9bb.usados/b9bb.tope).toFixed(1) : '—';
-  const pct9bc = b9bc.tope>0 ? Math.min(100,100*b9bc.usados/b9bc.tope).toFixed(1) : '—';
+  const pct91 = b91.tope>0 ? (b91.resto>=0 ? Math.min(100,100*b91.usados/b91.tope).toFixed(1) : (100*b91.resto/b91.tope).toFixed(1)) : '—';
+  const pct9b = b9b.tope>0 ? (b9b.resto>=0 ? Math.min(100,100*b9b.usados/b9b.tope).toFixed(1) : (100*b9b.resto/b9b.tope).toFixed(1)) : '—';
+  const pct9bb = b9bb.tope>0 ? (b9bb.resto>=0 ? Math.min(100,100*b9bb.usados/b9bb.tope).toFixed(1) : (100*b9bb.resto/b9bb.tope).toFixed(1)) : '—';
+  const pct9bc = b9bc.tope>0 ? (b9bc.resto>=0 ? Math.min(100,100*b9bc.usados/b9bc.tope).toFixed(1) : (100*b9bc.resto/b9bc.tope).toFixed(1)) : '—';
   const totalUsado = b91.usados + b9b.usados + b9bb.usados + b9bc.usados;
   const totalTope  = b91.tope + b9b.tope + b9bb.tope + b9bc.tope;
   const pctTotal   = totalTope>0 ? Math.min(100,100*totalUsado/totalTope).toFixed(1) : '—';
@@ -1204,14 +1204,15 @@ function renderBolsaBlock(b,dir,bolsaName,ids){
  else{ restBox.className='bolsa-stat bs-neg'; restLbl.textContent='Días en exceso'; }
  // progress bar
  const track=document.getElementById(ids.track);
+ const pctExceso = (tope>0 && resto<0) ? (100*Math.abs(resto)/tope).toFixed(1) : null;
  if(resto>=0){
   const pctUsado=Math.min(100,100*usados/tope);
   track.innerHTML='<div class="progress-used" style="width:'+pctUsado+'%">'+fmt(usados)+' usados</div>'+
    '<div class="progress-rest">'+fmt(resto)+' disponibles</div>';
  }else{
-  const pctTope=100*tope/usados;
+  const pctTope=tope>0?100*tope/usados:0;
   track.innerHTML='<div class="progress-used" style="width:'+pctTope+'%">'+fmt(tope)+' (bolsa)</div>'+
-   '<div class="progress-over">+'+fmt(Math.abs(resto))+' exceso</div>';
+   '<div class="progress-over">+'+fmt(Math.abs(resto))+' exceso'+(pctExceso!==null?' (-'+pctExceso+'%)':'')+'</div>';
  }
  // note text
  const nm=dir.toUpperCase();
@@ -1220,8 +1221,9 @@ function renderBolsaBlock(b,dir,bolsaName,ids){
   txt=nm+' dispone de una bolsa '+bolsaName+' de <b>'+fmt(tope)+' días</b>; ha consumido <b>'+fmt(usados)+
    ' días</b>, por lo que le quedan <b>'+fmt(resto)+' días</b> disponibles ('+(100*resto/tope).toFixed(1)+'% de la bolsa).';
  }else{
+  const pctTxt = pctExceso!==null ? ' (<b style="color:#c0392b">-'+pctExceso+'%</b> de la bolsa)' : '';
   txt=nm+' dispone de una bolsa '+bolsaName+' de <b>'+fmt(tope)+' días</b>; ha consumido <b>'+fmt(usados)+
-   ' días</b>, <b>'+fmt(Math.abs(resto))+' días por encima</b> de la bolsa disponible.';
+   ' días</b>, <b>'+fmt(Math.abs(resto))+' días por encima</b> de la bolsa disponible'+pctTxt+'.';
  }
  document.getElementById(ids.note).innerHTML=txt;
  // stacked bar chart
