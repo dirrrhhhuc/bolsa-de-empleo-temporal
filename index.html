@@ -473,6 +473,7 @@ var o=[];var l=Array.isArray(e);for(f=n.s.c;f<=n.e.c;++f)s[f]=ya(f);for(var c=n.
    y mantener las hojas: 2026, I91c, I9B1a
 ============================================================== */
 const CSV_FILE = 'datos.csv';
+const XLSX_FILE = 'Dashboard_Bolsa.xlsx';
 const LOADER_MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
 /* ---- Funciones auxiliares ---- */
@@ -482,6 +483,7 @@ function norm(s){
  return s.toLowerCase().trim();
 }
 function parseDate(v){
+ if(v instanceof Date && !isNaN(v)) return v;
  // Formato dd/mm/yyyy
  if(typeof v==='string'&&v.match(/^\d{2}\/\d{2}\/\d{4}$/)){
   const p=v.split('/');
@@ -562,8 +564,10 @@ function parseCSV(text){
 
 /* ---- Construcción del DATA desde CSV ---- */
 function buildDataFromCSV(text){
- const rawRows = parseCSV(text);
+ return buildDataFromRows(parseCSV(text));
+}
 
+function buildDataFromRows(rawRows){
  // Mapear campos CSV a campos del dashboard
  const rows = [];
  for(const r of rawRows){
@@ -659,24 +663,45 @@ function showLoadError(msg){
 
 async function loadDashboard(){
  try{
-  const url = CSV_FILE + '?v=' + Date.now();   // evita caché
-  const resp = await fetch(url);
-  if(!resp.ok) throw new Error('No se pudo encontrar el archivo "'+CSV_FILE+'" (código '+resp.status+').');
-  // Detectar codificación: BOM UTF-8 (EF BB BF) o windows-1252 (CSVs antiguos)
-  let text;
+  let DATA = null;
+
+  // 1) Intentar cargar el Excel (asi solo hay que subir el .xlsx, sin convertir a CSV)
   try{
-   const buf = await resp.arrayBuffer();
-   const bytes = new Uint8Array(buf);
-   const tieneBOM = bytes.length>=3 && bytes[0]===0xEF && bytes[1]===0xBB && bytes[2]===0xBF;
-   text = tieneBOM ? new TextDecoder('utf-8').decode(buf) : new TextDecoder('windows-1252').decode(buf);
+   const xresp = await fetch(XLSX_FILE + '?v=' + Date.now());
+   if(xresp.ok){
+    const xbuf = await xresp.arrayBuffer();
+    const wb = XLSX.read(xbuf, {type:'array', cellDates:true});
+    const sheetName = wb.SheetNames.includes('2026') ? '2026' : wb.SheetNames[0];
+    const ws = wb.Sheets[sheetName];
+    const rawRows = XLSX.utils.sheet_to_json(ws, {defval:''});
+    const parsedXlsx = buildDataFromRows(rawRows);
+    if(parsedXlsx.rows.length) DATA = parsedXlsx;
+   }
   }catch(e){
-   text = await resp.text();
+   console.warn('No se pudo leer el Excel "'+XLSX_FILE+'", se intentara el CSV:', e);
   }
-  const DATA = buildDataFromCSV(text);
-  if(!DATA.rows.length) throw new Error('El CSV se leyó pero no contiene filas de datos válidos.');
+
+  // 2) Si no hay Excel valido, usar el CSV como respaldo
+  if(!DATA){
+   const url = CSV_FILE + '?v=' + Date.now();   // evita cache
+   const resp = await fetch(url);
+   if(!resp.ok) throw new Error('No se encontro ni "'+XLSX_FILE+'" ni "'+CSV_FILE+'" (codigo '+resp.status+').');
+   let text;
+   try{
+    const buf = await resp.arrayBuffer();
+    const bytes2 = new Uint8Array(buf);
+    const tieneBOM = bytes2.length>=3 && bytes2[0]===0xEF && bytes2[1]===0xBB && bytes2[2]===0xBF;
+    text = tieneBOM ? new TextDecoder('utf-8').decode(buf) : new TextDecoder('windows-1252').decode(buf);
+   }catch(e){
+    text = await resp.text();
+   }
+   DATA = buildDataFromCSV(text);
+   if(!DATA.rows.length) throw new Error('El CSV se leyo pero no contiene filas de datos validos.');
+  }
+
   window.__DATA__ = DATA;
   const sp=document.getElementById('loadspin'); if(sp) sp.style.display='none';
-  initDashboard(DATA);     // arranca el dashboard con los datos del CSV
+  initDashboard(DATA);
  }catch(err){
   console.error(err);
   showLoadError(err.message||String(err));
